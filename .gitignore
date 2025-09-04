@@ -1,0 +1,17 @@
+
+# Python
+__pycache__/
+*.pyc
+
+# Playwright artifacts
+playwright-report/
+test-results/
+*.log
+after_upload.png
+
+# PDF bin
+bantin/*.pdf
+bantin/*.PDF
+
+# Env
+.env
