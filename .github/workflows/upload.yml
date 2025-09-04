@@ -4,7 +4,7 @@ name: Auto Upload Bản tin (Hà Tĩnh)
 on:
   schedule:
     # 04:30 ICT mỗi ngày = 21:30 UTC ngày hôm trước
-    - cron: '30 21 * * *'
+    - cron: '45 20 * * *'
   workflow_dispatch:
 
 concurrency:
