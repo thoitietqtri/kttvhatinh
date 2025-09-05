@@ -13,13 +13,13 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90   # đủ cho 2 lần chờ 10' + cài đặt + 3 lần thử
 
     env:
-      USERNAME: ${{ secrets.USERNAME }}
-      PASSWORD: ${{ secrets.PASSWORD }}
-      PORTAL_URL: ${{ secrets.PORTAL_URL }}
-      UPLOAD_URL: ${{ secrets.UPLOAD_URL }}
+      USERNAME: ${{ secrets.USERNAME }}       # HTIN
+      PASSWORD: ${{ secrets.PASSWORD }}       # HTIN
+      PORTAL_URL: ${{ secrets.PORTAL_URL }}   # http://222.255.11.117:8888/Login.aspx
+      UPLOAD_URL: ${{ secrets.UPLOAD_URL }}   # http://222.255.11.117:8888/UploadFile.aspx
 
     steps:
       - name: Checkout
@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install deps
+      - name: Install deps (Playwright + Chromium)
         run: |
           python -m pip install --upgrade pip
           pip install playwright python-dotenv
@@ -47,23 +47,52 @@ jobs:
           print("OK: Secrets đủ.")
           PY
 
+      - name: Ensure PDFs exist under bantin/
+        run: |
+          ls bantin/*.pdf >/dev/null 2>&1 || (echo "::error::No PDFs in bantin/"; exit 1)
+
       - name: Check portal reachability (HEAD)
         run: |
           set -e
           for url in "$PORTAL_URL" "$UPLOAD_URL"; do
             echo "Checking $url ..."
-            curl -I --max-time 20 "$url" || echo "::warning::Không HEAD được $url (có thể chặn từ GitHub runners)."
+            curl -I --max-time 20 "$url" || echo "::warning::Không HEAD được $url (có thể chặn GitHub runners)."
           done
 
-      - name: Run uploader
+      - name: Run uploader (retry tối đa 3 lần, cách nhau 10 phút)
+        shell: bash
         run: |
-          python tools/playwright_uploader.py
+          set -euo pipefail
+          max=3
+          gap_sec=$((10*60))   # 10 phút
+          for attempt in $(seq 1 $max); do
+            echo "===== Attempt $attempt/$max ====="
+            if python tools/playwright_uploader.py; then
+              echo "✅ Thành công ở lần $attempt — dừng retry."
+              ts=$(date +%Y%m%d_%H%M%S)
+              [ -f after_upload.png ] && cp -f after_upload.png "after_upload_attempt_${attempt}_$ts.png"
+              [ -f tools/uploader.log ] && cp -f tools/uploader.log "tools/uploader_attempt_${attempt}_$ts.log"
+              exit 0
+            else
+              echo "❌ Thất bại lần $attempt"
+              ts=$(date +%Y%m%d_%H%M%S)
+              [ -f after_upload.png ] && cp -f after_upload.png "after_upload_attempt_${attempt}_$ts.png" || true
+              [ -f tools/uploader.log ] && cp -f tools/uploader.log "tools/uploader_attempt_${attempt}_$ts.log" || true
+              if [ "$attempt" -lt "$max" ]; then
+                echo "⏳ Chờ 10 phút rồi thử lại..."
+                sleep "$gap_sec"
+              fi
+            fi
+          done
+          echo "🚫 Hết số lần thử, vẫn thất bại."
+          exit 1
 
       - name: Upload artifact (screenshots/logs)
         uses: actions/upload-artifact@v4
         with:
           name: hattinh-upload-proof
           path: |
-            after_upload.png
+            after_upload*.png
             tools/*.log
+            tools/uploader_attempt_*.log
           if-no-files-found: warn
