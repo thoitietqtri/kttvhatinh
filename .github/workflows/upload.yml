@@ -3,7 +3,7 @@ name: Auto Upload BanTin
 
 on:
   schedule:
-    # 04:30 ICT hằng ngày = 21:30 UTC ngày hôm trước
+    # 03:45 ICT hằng ngày = 20:45 UTC ngày hôm trước
 =======
 
 name: Auto Upload Bản tin (Hà Tĩnh)
