@@ -1,75 +1,18 @@
-<<<<<<< HEAD
-name: Auto Upload BanTin
-
-on:
-  schedule:
-    # 03:45 ICT hằng ngày = 20:45 UTC ngày hôm trước
-=======
-
 name: Auto Upload Bản tin (Hà Tĩnh)
 
 on:
   schedule:
-    # 04:30 ICT mỗi ngày = 21:30 UTC ngày hôm trước
->>>>>>> 3554d6c11b541dda0a356ce8eb2f6d0ef9bbe81d
+    # 03:45 ICT mỗi ngày = 20:45 UTC ngày hôm trước
     - cron: '45 20 * * *'
   workflow_dispatch:
 
 concurrency:
-<<<<<<< HEAD
-  group: auto-upload-bantin
-=======
   group: kttvhatinh-auto-upload
->>>>>>> 3554d6c11b541dda0a356ce8eb2f6d0ef9bbe81d
   cancel-in-progress: true
 
 jobs:
   run:
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    timeout-minutes: 20
-
-    # Nhận user/pass + URL từ Secrets
-    env:
-      PORTAL_URL: ${{ secrets.PORTAL_URL }}   # vd: http://222.255.11.117:8888/Login.aspx
-      UPLOAD_URL: ${{ secrets.UPLOAD_URL }}   # vd: http://222.255.11.117:8888/UploadFile.aspx
-      USERNAME:   ${{ secrets.USERNAME }}     # HTIN
-      PASSWORD:   ${{ secrets.PASSWORD }}     # HTIN
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      # Kiểm tra Secrets có đủ chưa
-      - name: Check required secrets
-        shell: bash
-        run: |
-          check() {
-            if [ -z "$1" ]; then
-              echo "::error::$2 is missing. Add it in Settings → Secrets and variables → Actions."
-              exit 1
-            fi
-          }
-          check "${USERNAME}" "USERNAME"
-          check "${PASSWORD}" "PASSWORD"
-          if [ -z "${PORTAL_URL}" ]; then
-            echo "::notice::PORTAL_URL not set; will default to http://222.255.11.117:8888/Login.aspx"
-          fi
-          if [ -z "${UPLOAD_URL}" ]; then
-            echo "::notice::UPLOAD_URL not set; will default to http://222.255.11.117:8888/UploadFile.aspx"
-          fi
-
-      # Phải có ÍT NHẤT 1 file PDF trong thư mục bantin/ (giữ nguyên tên gốc)
-      - name: Ensure PDFs exist under bantin/
-        shell: bash
-        run: |
-          if ls bantin/*.pdf 1> /dev/null 2>&1; then
-            echo "Found PDF(s) in bantin/."
-          else
-            echo "::error::No PDFs found in bantin/. Upload your files (keep original names) into bantin/."
-            exit 1
-          fi
-
-=======
     timeout-minutes: 25
 
     env:
@@ -82,32 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
->>>>>>> 3554d6c11b541dda0a356ce8eb2f6d0ef9bbe81d
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-<<<<<<< HEAD
-      - name: Install Playwright (Chromium)
-        shell: bash
-        run: |
-          pip install --upgrade pip
-          pip install playwright python-dotenv requests
-          python -m playwright install --with-deps chromium
-
-      # Kiểm tra kết nối tới Login.aspx (chỉ cảnh báo; không fail job)
-      - name: Reachability check (login page)
-        shell: bash
-        continue-on-error: true
-        run: |
-          url="${PORTAL_URL:-http://222.255.11.117:8888/Login.aspx}"
-          echo "Checking: $url"
-          curl -I --max-time 15 "$url" || echo "::warning::Cannot reach $url from GitHub runners. If internal-only, use a self-hosted runner."
-
-      - name: Run uploader
-        shell: bash
-=======
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
@@ -134,23 +56,14 @@ jobs:
           done
 
       - name: Run uploader
->>>>>>> 3554d6c11b541dda0a356ce8eb2f6d0ef9bbe81d
         run: |
           python tools/playwright_uploader.py
 
       - name: Upload artifact (screenshots/logs)
         uses: actions/upload-artifact@v4
         with:
-<<<<<<< HEAD
-          name: upload-proof
-          path: |
-            after_upload.png
-            tools/*.log
-          if-no-files-found: ignore
-=======
           name: hattinh-upload-proof
           path: |
             after_upload.png
             tools/*.log
           if-no-files-found: warn
->>>>>>> 3554d6c11b541dda0a356ce8eb2f6d0ef9bbe81d
