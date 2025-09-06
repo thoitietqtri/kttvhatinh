@@ -1,98 +1,92 @@
-name: Auto Upload Bản tin (Hà Tĩnh)
+name: Auto Upload BanTin
 
 on:
   schedule:
-    # 03:45 ICT mỗi ngày = 20:45 UTC ngày hôm trước
+    # 04:00 ICT hằng ngày = 21:00 UTC ngày hôm trước
     - cron: '45 20 * * *'
   workflow_dispatch:
 
 concurrency:
-  group: kttvhatinh-auto-upload
+  group: auto-upload-bantin
   cancel-in-progress: true
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 90   # đủ cho 2 lần chờ 10' + cài đặt + 3 lần thử
+    timeout-minutes: 20
 
+    # Nhận user/pass + URL từ Secrets
     env:
-      USERNAME: ${{ secrets.USERNAME }}       # HTIN
-      PASSWORD: ${{ secrets.PASSWORD }}       # HTIN
-      PORTAL_URL: ${{ secrets.PORTAL_URL }}   # http://222.255.11.117:8888/Login.aspx
-      UPLOAD_URL: ${{ secrets.UPLOAD_URL }}   # http://222.255.11.117:8888/UploadFile.aspx
+      PORTAL_URL: ${{ secrets.PORTAL_URL }}   # vd: http://222.255.11.117:8888/Login.aspx
+      UPLOAD_URL: ${{ secrets.UPLOAD_URL }}   # vd: http://222.255.11.117:8888/UploadFile.aspx
+      USERNAME:   ${{ secrets.USERNAME }}     # QTRI
+      PASSWORD:   ${{ secrets.PASSWORD }}     # Qtri
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
+
+      # Kiểm tra Secrets có đủ chưa
+      - name: Check required secrets
+        shell: bash
+        run: |
+          check() {
+            if [ -z "$1" ]; then
+              echo "::error::$2 is missing. Add it in Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+          }
+          check "${USERNAME}" "USERNAME"
+          check "${PASSWORD}" "PASSWORD"
+          if [ -z "${PORTAL_URL}" ]; then
+            echo "::notice::PORTAL_URL not set; will default to http://222.255.11.117:8888/Login.aspx"
+          fi
+          if [ -z "${UPLOAD_URL}" ]; then
+            echo "::notice::UPLOAD_URL not set; will default to http://222.255.11.117:8888/UploadFile.aspx"
+          fi
+
+      # Phải có ÍT NHẤT 1 file PDF trong thư mục bantin/ (giữ nguyên tên gốc)
+      - name: Ensure PDFs exist under bantin/
+        shell: bash
+        run: |
+          if ls bantin/*.pdf 1> /dev/null 2>&1; then
+            echo "Found PDF(s) in bantin/."
+          else
+            echo "::error::No PDFs found in bantin/. Upload your files (keep original names) into bantin/."
+            exit 1
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install deps (Playwright + Chromium)
-        run: |
-          python -m pip install --upgrade pip
-          pip install playwright python-dotenv
-          playwright install --with-deps chromium
-
-      - name: Sanity check env
-        run: |
-          python - <<'PY'
-          import os, sys
-          miss = [k for k in ["USERNAME","PASSWORD","PORTAL_URL","UPLOAD_URL"] if not os.getenv(k)]
-          if miss:
-              print("::error::Thiếu secrets:", ", ".join(miss))
-              sys.exit(1)
-          print("OK: Secrets đủ.")
-          PY
-
-      - name: Ensure PDFs exist under bantin/
-        run: |
-          ls bantin/*.pdf >/dev/null 2>&1 || (echo "::error::No PDFs in bantin/"; exit 1)
-
-      - name: Check portal reachability (HEAD)
-        run: |
-          set -e
-          for url in "$PORTAL_URL" "$UPLOAD_URL"; do
-            echo "Checking $url ..."
-            curl -I --max-time 20 "$url" || echo "::warning::Không HEAD được $url (có thể chặn GitHub runners)."
-          done
-
-      - name: Run uploader (retry tối đa 3 lần, cách nhau 10 phút)
+      - name: Install Playwright (Chromium)
         shell: bash
         run: |
-          set -euo pipefail
-          max=3
-          gap_sec=$((10*60))   # 10 phút
-          for attempt in $(seq 1 $max); do
-            echo "===== Attempt $attempt/$max ====="
-            if python tools/playwright_uploader.py; then
-              echo "✅ Thành công ở lần $attempt — dừng retry."
-              ts=$(date +%Y%m%d_%H%M%S)
-              [ -f after_upload.png ] && cp -f after_upload.png "after_upload_attempt_${attempt}_$ts.png"
-              [ -f tools/uploader.log ] && cp -f tools/uploader.log "tools/uploader_attempt_${attempt}_$ts.log"
-              exit 0
-            else
-              echo "❌ Thất bại lần $attempt"
-              ts=$(date +%Y%m%d_%H%M%S)
-              [ -f after_upload.png ] && cp -f after_upload.png "after_upload_attempt_${attempt}_$ts.png" || true
-              [ -f tools/uploader.log ] && cp -f tools/uploader.log "tools/uploader_attempt_${attempt}_$ts.log" || true
-              if [ "$attempt" -lt "$max" ]; then
-                echo "⏳ Chờ 10 phút rồi thử lại..."
-                sleep "$gap_sec"
-              fi
-            fi
-          done
-          echo "🚫 Hết số lần thử, vẫn thất bại."
-          exit 1
+          pip install --upgrade pip
+          pip install playwright python-dotenv requests
+          python -m playwright install --with-deps chromium
+
+      # Kiểm tra kết nối tới Login.aspx (chỉ cảnh báo; không fail job)
+      - name: Reachability check (login page)
+        shell: bash
+        continue-on-error: true
+        run: |
+          url="${PORTAL_URL:-http://222.255.11.117:8888/Login.aspx}"
+          echo "Checking: $url"
+          curl -I --max-time 15 "$url" || echo "::warning::Cannot reach $url from GitHub runners. If internal-only, use a self-hosted runner."
+
+      - name: Run uploader
+        shell: bash
+        run: |
+          python tools/playwright_uploader.py
 
       - name: Upload artifact (screenshots/logs)
         uses: actions/upload-artifact@v4
         with:
-          name: hattinh-upload-proof
+          name: upload-proof
           path: |
-            after_upload*.png
+            after_upload.png
             tools/*.log
-            tools/uploader_attempt_*.log
-          if-no-files-found: warn
+          if-no-files-found: ignore
