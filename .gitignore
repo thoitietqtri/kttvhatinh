@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 __pycache__/
 *.py[cod]
 .env
@@ -12,23 +11,3 @@ after_upload.png
 tools/*.log
 /*.pdf
 !bantin/*.pdf
-
-=======
-
-# Python
-__pycache__/
-*.pyc
-
-# Playwright artifacts
-playwright-report/
-test-results/
-*.log
-after_upload.png
-
-# PDF bin
-bantin/*.pdf
-bantin/*.PDF
-
-# Env
-.env
->>>>>>> 3554d6c11b541dda0a356ce8eb2f6d0ef9bbe81d
